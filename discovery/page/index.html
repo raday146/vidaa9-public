@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VIDAA discovery (read-only)</title>
+  <style>
+    body { font: 20px/1.5 system-ui, sans-serif; margin: 4vh 6vw; background:#111; color:#eee; }
+    h1 { font-size: 1.4em; }
+    .ok { color:#6f6; } .warn { color:#fc6; } .err { color:#f66; }
+    dl { display:grid; grid-template-columns:auto 1fr; gap:.3em 1em; }
+    dt { color:#9bf; }
+    pre { white-space:pre-wrap; word-break:break-all; color:#aaa; font-size:.8em; }
+  </style>
+</head>
+<body>
+  <h1>VIDAA discovery &mdash; read-only</h1>
+  <p id="status">Running&hellip;</p>
+  <dl id="summary"></dl>
+  <pre id="post"></pre>
+
+<script>
+"use strict";
+// Read-only discovery. Calls ONLY Hisense_GetFirmWareVersion and
+// Hisense_FileRead; everything else is name/arity enumeration (never invoked,
+// never .toString()'d). No eval. No code fetched or run from the network.
+// The whole payload is POSTed to our own server (same origin) at /result.
+
+var FN_RE = /^(Hisense|HiUtils|vowOS|omi|vidaa)/i;
+var FLAG_RE = /launch|start|open|app|intent|deeplink|source/i;
+// has.launch = a function that really launches an app (not any FLAG_RE hit).
+var LAUNCH_RE = /launch|(start|open)App/i;
+var APPINFO_PATH = "websdk/Appinfo.json";
+
+function call(name, args) {
+  // Only used for the two whitelisted read-only functions.
+  try {
+    var f = window[name];
+    if (typeof f !== "function") return { ok: false, error: "not a function" };
+    return { ok: true, value: f.apply(window, args || []) };
+  } catch (e) {
+    return { ok: false, error: String(e && e.message || e) };
+  }
+}
+
+function enumerateFunctions() {
+  // Record NAME and arity (fn.length) only. Never read the source.
+  var out = [];
+  var names = Object.getOwnPropertyNames(window);
+  for (var i = 0; i < names.length; i++) {
+    var n = names[i];
+    if (!FN_RE.test(n)) continue;
+    var v;
+    try { v = window[n]; } catch (e) { continue; }   // some props throw on read
+    if (typeof v !== "function") continue;
+    out.push({ name: n, length: v.length, flagged: FLAG_RE.test(n) });
+  }
+  out.sort(function (a, b) { return a.name < b.name ? -1 : 1; });
+  return out;
+}
+
+function readAppinfo() {
+  // Chunked read: Hisense_FileRead(path, offset). Advance by returned length,
+  // stop on empty/"null"/"undefined" or a chunk shorter than the first full
+  // one (last partial chunk). Hard caps guard against a never-ending loop.
+  // ponytail: offset treated as char-count of what came back; if the TV counts
+  //   bytes, multibyte JSON could misalign. Appinfo.json is ASCII in practice;
+  //   upgrade to a byte-aware read only if a real file breaks the JSON check.
+  if (typeof window.Hisense_FileRead !== "function") {
+    return { error: "Hisense_FileRead not a function" };
+  }
+  var MAX_CHUNKS = 200, MAX_BYTES = 5 * 1024 * 1024;
+  var parts = [], offset = 0, firstLen = 0;
+  for (var i = 0; i < MAX_CHUNKS; i++) {
+    var r = call("Hisense_FileRead", [APPINFO_PATH, offset]);
+    if (!r.ok) return { error: r.error, partial: parts.join("") };
+    var chunk = r.value;
+    if (chunk == null || chunk === "" || chunk === "null" || chunk === "undefined") break;
+    chunk = String(chunk);
+    parts.push(chunk);
+    if (i === 0) firstLen = chunk.length;
+    offset += chunk.length;
+    if (offset > MAX_BYTES) return { error: "exceeded size cap", partial: parts.join("") };
+    if (chunk.length < firstLen) break;   // last (short) chunk
+  }
+  var content = parts.join("");
+  if (content === "") return { content: "", length: 0, empty: true };
+  var valid = false;
+  try { JSON.parse(content); valid = true; } catch (e) { valid = false; }
+  return { content: content, length: content.length, valid: valid };
+}
+
+function run() {
+  var fw = call("Hisense_GetFirmWareVersion");
+  var fns = enumerateFunctions();
+  var appinfo = readAppinfo();
+
+  var names = fns.map(function (f) { return f.name; });
+  var has = function (n) { return names.indexOf(n) !== -1; };
+  var hasInstall = has("Hisense_installApp") || has("HiUtils_createRequest");
+  var hasLaunch = fns.some(function (f) { return LAUNCH_RE.test(f.name); });
+  var hasFileRead = has("Hisense_FileRead");
+
+  var result = {
+    collectedAt: new Date().toISOString(),
+    userAgent: navigator.userAgent,
+    firmware: fw.ok ? fw.value : null,
+    firmwareError: fw.ok ? null : fw.error,
+    functionCount: fns.length,
+    functions: fns,
+    has: { install: hasInstall, launch: hasLaunch, fileRead: hasFileRead },
+    appinfo: appinfo
+  };
+
+  render(result);
+  post(result);
+}
+
+function render(r) {
+  document.getElementById("status").innerHTML = '<span class="ok">Done.</span>';
+  var appLen = r.appinfo.empty ? "empty"
+    : (r.appinfo.length != null ? r.appinfo.length + " chars"
+      + (r.appinfo.valid === false ? " (NOT valid JSON)" : r.appinfo.valid ? " (valid JSON)" : "")
+      : ("error: " + r.appinfo.error));
+  var rows = [
+    ["Firmware", r.firmware || ("error: " + r.firmwareError)],
+    ["Functions found", String(r.functionCount)],
+    ["Install fn exists", String(r.has.install)],
+    ["Launch fn exists", String(r.has.launch)],
+    ["FileRead fn exists", String(r.has.fileRead)],
+    ["Appinfo.json", appLen]
+  ];
+  document.getElementById("summary").innerHTML = rows.map(function (kv) {
+    return "<dt>" + kv[0] + "</dt><dd>" + kv[1] + "</dd>";
+  }).join("");
+}
+
+function post(result) {
+  var el = document.getElementById("post");
+  try {
+    var xhr = new XMLHttpRequest();        // old TV browser: XHR is safest
+    xhr.open("POST", "/result", true);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState === 4) {
+        el.textContent = "POST /result -> " + xhr.status;
+      }
+    };
+    xhr.send(JSON.stringify(result));
+  } catch (e) {
+    el.textContent = "POST failed: " + e;
+  }
+}
+
+run();
+</script>
+</body>
+</html>

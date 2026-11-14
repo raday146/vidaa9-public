@@ -1,0 +1,5 @@
+tools/
+discovery/out/
+*.pem
+*.key
+__pycache__/

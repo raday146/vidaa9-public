@@ -1,0 +1,526 @@
+{
+  "firmware": "V0000.09.60A.Q0707",
+  "functionCount": 130,
+  "functions": [
+    {
+      "name": "HiUtils_createRequest",
+      "arity": 2
+    },
+    {
+      "name": "Hisense_CheckAccessCode",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_CheckCodeValid",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_Decrypt",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_EnableDebugLog",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_Encrypt",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_FileRead",
+      "arity": 2
+    },
+    {
+      "name": "Hisense_FileWrite",
+      "arity": 3
+    },
+    {
+      "name": "Hisense_Get4KSupportState",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetAdTargetEnable",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetAdsID",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetApiVersion",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetArcMode",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetAudioFormat",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetAudioMode",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetBlockEndTime",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetBlockStartTime",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetBlockTimeWeekly",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetBrand",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetCCAtvChannel",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetCCAtvSupport",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetCCDtvService",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetCapabilityCode",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetChipSetName",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetChromiumVersion",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetCountryCode",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetCurrentBrowser",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetCustomerID",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetDNS",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetDatePattern",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetDebugLevelForHisenseUI",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetDeviceCode",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetDeviceID",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_GetDeviceInfo",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetDialInfo",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetDrmInfo",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetDtvStandard",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetEulaAdEnable",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetFaderMode",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetFeatureCode",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetFirmWareVersion",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetHighContrastMenuStatus",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetIPAddress",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetIsHotelMode",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetLocaleLanguage",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetMacAddress",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetMagnification",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetMagnificationEnable",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetMainSoundDev",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetMenuLanguageCode",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetMenuScheme",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetMenuTransparecy",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetModelName",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetMute",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetNetStatus",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetNetType",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetNetworkInfo",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetOSVersion",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetPanelResolution",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetParentControlEnabled",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetParentControlInfo",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetPictureInfo",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetPictureMode",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetPlayerFeatureInfo",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetPrimarySubtitle",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetRebrandingEnable",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetRegion",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetResolution",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetRoleID",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetSecondarySubtitle",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetSeleniumDebug",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetSerialType",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetSoundInfo",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetSubtitleMode",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetSubtitleStatus",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetSubtitleStorage",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetSubtitleStyle",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetSupportForDolbyAtmos",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetSupportForHDR",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetSupportForHDRInfo",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetSupportTTS",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetTTSEnable",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetTTSFocusAudio",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetTTSInfo",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetTTSLanguage",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetTTSPitch",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetTTSRate",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetTTSSupportLanguage",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetTTSVolume",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetTestApiList",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetTimeZone",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetTunerSupport",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetTvLogo",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetUpdatesVerInfo",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_GetUuid",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetVersionStatus",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetVolume",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetVolumeBarMode",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetVolumeBarVisible",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetVolumeType",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetWolEnable",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_GetWowEnable",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_HiSdkJsonVerifyHeap",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_HiSdkSignCreate",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_HiSdkSignCreateSoundbar",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_LoginWithVIDAA",
+      "arity": 2
+    },
+    {
+      "name": "Hisense_PrintLogMessage",
+      "arity": 2
+    },
+    {
+      "name": "Hisense_RSADecrypt",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_RegisterObserver",
+      "arity": 2
+    },
+    {
+      "name": "Hisense_RegisterVolumeObserver",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_ResetDevice",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_SetCustomerID",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_SetDNS",
+      "arity": 2
+    },
+    {
+      "name": "Hisense_SetRemoteKeyboard",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_SetRoleID",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_SetSeleniumDebug",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_SetVolume",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_SupportAppConfig",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_UnregisterObserver",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_WriteTvRunLog",
+      "arity": 2
+    },
+    {
+      "name": "Hisense_disableVKB",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_enableVKB",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_getDebugPort",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_getInstalledApps",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_getMemInfo",
+      "arity": 0
+    },
+    {
+      "name": "Hisense_installApp",
+      "arity": 11
+    },
+    {
+      "name": "Hisense_installApp_V2",
+      "arity": 2
+    },
+    {
+      "name": "Hisense_setDebugPort",
+      "arity": 2
+    },
+    {
+      "name": "Hisense_setStartBandwidth",
+      "arity": 1
+    },
+    {
+      "name": "Hisense_uninstallApp",
+      "arity": 2
+    }
+  ]
+}

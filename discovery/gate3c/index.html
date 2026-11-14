@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VIDAA gate 3c install</title>
+<style>
+  body { font: 20px/1.5 system-ui, sans-serif; margin: 3vh 5vw; background:#111; color:#eee; }
+  h1 { font-size: 1.1em; }
+  button { font: inherit; padding: .4em 1em; margin: 0 .6em .6em 0; background:#333; color:#eee; border:2px solid #666; }
+  button:focus { border-color:#4af; outline:none; }
+  button:disabled { opacity:.35; }
+  #verdict { font-size: 3em; font-weight: bold; min-height: 1.3em; }
+  .ok { color:#4c4; } .bad { color:#e55; } .warn { color:#fc4; }
+  pre { white-space: pre-wrap; word-break: break-all; color:#ccc; font-size:.7em; }
+</style>
+</head>
+<body>
+<h1>VIDAA gate 3c &mdash; installAppNew (writes websdk/Appinfo.json)</h1>
+<div id="locks"></div>
+<p><button id="install" disabled>Install D-pad Test</button><button id="restore" disabled>Restore backup</button></p>
+<div id="verdict"></div>
+<pre id="log"></pre>
+
+<script>
+"use strict";
+// Touches ONLY HiUtils_createRequest 'fileRead' / 'fileWrite' on APPINFO_PATH. Nothing else.
+// Format copied from tools/vidaa-edge/.../app-management.service.ts installAppNew (:121-201).
+
+var APP_ID = "vidaa-launcher-gate3", APP_NAME = "D-pad Test";
+var APP_URL = "https://vidaa-dpad-test.raday146.workers.dev/";
+var ICON_URL = APP_URL + "icon.png";
+var APPINFO_PATH = "websdk/Appinfo.json", APPINFO_MODE = 6;
+var KEY = "gate3c-original-backup";      // localStorage: survives a page reload
+var MISSING = JSON.stringify({ original: "MISSING" });   // backup value when the file did not exist
+
+var $ = function (id) { return document.getElementById(id); };
+function log(s) { $("log").textContent += new Date().toISOString().slice(11, 19) + "  " + s + "\n"; }
+function show(v) { try { var j = JSON.stringify(v); return j === undefined ? String(v) : j; } catch (e) { return String(v); } }
+function verdict(text, cls) { $("verdict").textContent = text; $("verdict").className = cls; }
+function post(body, cb) {
+  try {
+    var x = new XMLHttpRequest();
+    x.open("POST", "/result", true);
+    x.setRequestHeader("Content-Type", "application/json");
+    x.onreadystatechange = function () { if (x.readyState === 4) { log("POST " + body.kind + " -> " + x.status); if (cb) cb(x.status); } };
+    x.send(JSON.stringify(body));
+  } catch (e) { log("POST failed: " + e); if (cb) cb(0); }
+}
+
+// The only two TV calls in this page.
+function fileRead() { return window.HiUtils_createRequest("fileRead", { path: APPINFO_PATH, mode: APPINFO_MODE }); }
+function fileWrite(data) { return window.HiUtils_createRequest("fileWrite", { path: APPINFO_PATH, mode: APPINFO_MODE, writedata: data }); }
+// Run a TV call that may return {ret,msg} or a thenable, or throw. Always resolves {v} or {e}; never rejects.
+function attempt(fn) {
+  return new Promise(function (res) { res(fn()); }).then(function (v) { return { v: v }; },
+    function (e) { log("exception: " + e); return { e: String(e) }; });
+}
+function wait(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
+// write, wait 1000 ms, re-read. Always resolves {w, rd} (each {v} or {e}).
+function writeThenRead(data) {
+  var out = {};
+  return attempt(function () { return fileWrite(data); }).then(function (w) {
+    out.w = w; log("fileWrite ret=" + show(w.v && w.v.ret) + " msg=" + show(w.v && w.v.msg).slice(0, 200));
+    return wait(1000);
+  }).then(function () { return attempt(fileRead); }).then(function (rd) {
+    out.rd = rd; var r = rd.v;
+    log("re-read ret=" + show(r && r.ret) + " length=" + (r && typeof r.msg === "string" ? r.msg.length : "n/a"));
+    return out;
+  });
+}
+
+// msg "" is allowed; otherwise it must be an object with an AppInfo array. Returns the object, or null.
+function parseAppinfo(msg) {
+  if (msg === "") return { AppInfo: [] };
+  try { var o = JSON.parse(msg); return o && typeof o === "object" && Array.isArray(o.AppInfo) ? o : null; } catch (e) { return null; }
+}
+// File cleanly absent: ret false AND ENOENT / errno -2. Any other failure stays locked.
+function isMissing(r) { return !!r && r.ret === false && !!r.msg && typeof r.msg === "object" && (r.msg.code === "ENOENT" || r.msg.errno === -2); }
+// First-read state as {AppInfo:[...]}: parsed file, empty list when MISSING, null otherwise.
+function initialState(r) {
+  if (isMissing(r)) return { AppInfo: [] };
+  return r && r.ret === true && typeof r.msg === "string" ? parseAppinfo(r.msg) : null;
+}
+function hasTestApp(o) { return o.AppInfo.some(function (a) { return a && a.Id === APP_ID; }); }
+function ser(a) { return JSON.stringify(a); }
+
+// MATCH: exact text. DIFFERENT: valid, has our entry, every original entry still present. Else BROKEN.
+function classify(r, next, orig) {
+  if (!r || r.ret !== true || typeof r.msg !== "string") return "BROKEN";
+  if (r.msg === next) return "MATCH";
+  var o = parseAppinfo(r.msg), before = orig === MISSING ? { AppInfo: [] } : parseAppinfo(orig);
+  if (!o || !before || !hasTestApp(o)) return "BROKEN";
+  var have = o.AppInfo.map(ser);
+  return before.AppInfo.every(function (a) { return have.indexOf(ser(a)) >= 0; }) ? "DIFFERENT" : "BROKEN";
+}
+
+// vidaa-edge entry, replace-or-push by Id; every other entry untouched.
+function buildInstalled(raw) {
+  var apps = raw === MISSING ? { AppInfo: [] } : parseAppinfo(raw);
+  var entry = { Id: APP_ID, AppName: APP_NAME, Title: APP_NAME, URL: APP_URL, StartCommand: APP_URL,
+    IconURL: ICON_URL, Icon_96: ICON_URL, Image: ICON_URL, Thumb: ICON_URL, Type: "Browser",
+    InstallTime: new Date().toISOString().split("T")[0], RunTimes: 0, StoreType: "custom", PreInstall: false };
+  var i = apps.AppInfo.findIndex(function (a) { return a && a.Id === APP_ID; });
+  if (i >= 0) apps.AppInfo[i] = entry; else apps.AppInfo.push(entry);
+  return JSON.stringify(apps);
+}
+
+var cur = null;        // first read {ret,msg}
+var posted = false;    // condition c
+var backup = null;     // original raw file text; null = none usable
+var busy = false, installed = false;
+
+function conditions() {
+  var parsed = initialState(cur);
+  return [
+    ["a) read ret === true, or file cleanly MISSING (ENOENT)", !!cur && (cur.ret === true || isMissing(cur))],
+    ["b) msg is \"\" or {AppInfo:[...]} (MISSING starts as {AppInfo:[]})", !!parsed],
+    ["c) backup POSTed, server 200", posted],
+    ["d) original backup in hand (not an already-modified file)", backup !== null],
+    ["e) test entry not already in file", !!parsed && !hasTestApp(parsed)]
+  ];
+}
+function render() {
+  var cs = conditions(), all = cs.every(function (c) { return c[1]; });
+  $("locks").innerHTML = cs.map(function (c) {
+    return '<div class="' + (c[1] ? "ok" : "bad") + '">' + (c[1] ? "OK  " : "FAIL ") + c[0] + "</div>";
+  }).join("");
+  $("install").disabled = !all || busy || installed;
+  $("restore").disabled = backup === null || busy;
+}
+
+function doInstall() {
+  if (busy || installed || $("install").disabled) return;
+  busy = true; installed = true; render();
+  var orig = backup, next = null;
+  new Promise(function (r) { next = buildInstalled(orig); r(writeThenRead(next)); }).then(function (o) {
+    var r = o.rd.v, outcome = classify(r, next, orig);
+    verdict(outcome, outcome === "MATCH" ? "ok" : outcome === "DIFFERENT" ? "warn" : "bad");
+    post({ kind: "appinfo-after", collectedAt: new Date().toISOString(), outcome: outcome, match: outcome === "MATCH",
+      writeRet: o.w.v && o.w.v.ret, writeError: o.w.e, readRet: r && r.ret, readError: o.rd.e,
+      expectedLength: next.length, raw: r && r.msg });
+  }).catch(function (e) { log("exception: " + e); verdict("BROKEN", "bad"); post({ kind: "appinfo-after", outcome: "BROKEN", match: false, error: String(e) }); })
+    .then(function () { busy = false; render(); });
+}
+
+function doRestore() {
+  if (busy || backup === null) return;
+  busy = true; render();
+  var orig = backup, miss = orig === MISSING, target = miss ? '{"AppInfo":[]}' : orig;   // can't delete the file: MISSING restores to empty
+  writeThenRead(target).then(function (o) {
+    var r = o.rd.v, got = !!r && r.ret === true && typeof r.msg === "string" ? parseAppinfo(r.msg) : null;
+    var match = miss ? !!got && got.AppInfo.length === 0 : !!r && r.ret === true && r.msg === orig;
+    var pa = !!got && !!parseAppinfo(target) && ser(got) === ser(parseAppinfo(target));
+    log("parsed equal: " + (pa ? "yes" : "no"));
+    if (match) { installed = false; try { localStorage.removeItem(KEY); } catch (e) { log("localStorage unavailable: key not removed"); } }
+    verdict("RESTORE " + (match ? (miss ? "OK" : "MATCH") : "MISMATCH"), match ? "ok" : "bad");
+    post({ kind: "restore-result", collectedAt: new Date().toISOString(), match: match, parsedEqual: pa,
+      writeRet: o.w.v && o.w.v.ret, writeError: o.w.e, readRet: r && r.ret, readError: o.rd.e, backupLength: orig.length, original: miss ? "MISSING" : undefined, raw: r && r.msg });
+  }).catch(function (e) { log("exception: " + e); verdict("RESTORE MISMATCH", "bad"); post({ kind: "restore-result", match: false, error: String(e) }); })
+    .then(function () { busy = false; render(); });
+}
+
+function start() {
+  if (typeof window.HiUtils_createRequest !== "function") { log("HiUtils_createRequest missing: stop"); render(); return; }
+  attempt(fileRead).then(function (a) {
+    if (a.e) { render(); return; }
+    cur = a.v;
+    var msg = cur && cur.msg;
+    var missing = isMissing(cur), parsed = initialState(cur);
+    log("fileRead ret=" + show(cur && cur.ret) + " length=" + (typeof msg === "string" ? msg.length : "n/a") + (missing ? " MISSING (ENOENT)" : ""));
+    log("parsed: " + (parsed ? show(parsed).slice(0, 3000) : "NOT a valid {AppInfo:[]} object; raw=" + show(msg).slice(0, 300)));
+
+    // d) backup choice: a clean file is the original. If our entry is already there (page reloaded
+    // after install), only a backup saved by an earlier load of this page counts.
+    if (parsed && !hasTestApp(parsed)) {
+      backup = missing ? MISSING : msg;
+      try { localStorage.setItem(KEY, backup); } catch (e) { log("localStorage unavailable: backup lives only until reload"); }
+    } else if (parsed) {
+      try { backup = localStorage.getItem(KEY); } catch (e) { backup = null; }
+      log(backup === null ? "test entry already present and no saved original backup" : "test entry already present; using backup saved by earlier load");
+    }
+    render();
+
+    post({ kind: "appinfo-backup", collectedAt: new Date().toISOString(), ret: cur && cur.ret, length: typeof msg === "string" ? msg.length : null,
+           originalFile: !!parsed && !hasTestApp(parsed), original: missing ? "MISSING" : undefined, raw: msg }, function (status) { posted = status === 200; render(); });
+  }).catch(function (e) { log("start exception: " + e); render(); });
+}
+
+$("install").onclick = doInstall;
+$("restore").onclick = doRestore;
+document.addEventListener("keydown", function (e) {   // arrows move between enabled buttons; Enter clicks the focused one natively
+  var d = (e.keyCode === 40 || e.keyCode === 39) ? 1 : (e.keyCode === 38 || e.keyCode === 37) ? -1 : 0;
+  if (!d) return;
+  var bs = [].filter.call(document.querySelectorAll("button"), function (b) { return !b.disabled; });
+  if (!bs.length) return;
+  bs[(bs.indexOf(document.activeElement) + d + bs.length) % bs.length].focus();
+  e.preventDefault();
+});
+render();
+start();
+</script>
+</body>
+</html>

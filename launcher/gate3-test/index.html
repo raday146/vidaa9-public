@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D-pad Test</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; color: #fff;
+    font: 28px/1.4 -apple-system, "Helvetica Neue", Arial, sans-serif; overflow: hidden; }
+  #wrap { padding: 4vh 6vw; }
+  #grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3vw; }
+  .tile { height: 28vh; border-radius: 24px; background: #222; border: 6px solid transparent;
+    display: flex; align-items: center; justify-content: center; font-size: 2em; box-sizing: border-box; }
+  .tile.focus { border-color: #fff; background: #345; transform: scale(1.06); }
+  .tile.sel { background: #2a7; }
+  #key { margin-top: 4vh; font-size: 1.3em; color: #9bf; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="grid"></div>
+  <div id="key">Press a key&hellip;</div>
+</div>
+<script>
+// Gate 3 D-pad test tile. Keyboard only (no mouse handlers). No network.
+// Arrows move focus, OK/Enter toggles highlight, last key name+code is shown.
+(function () {
+  var COLS = 3, ROWS = 2, pos = 0;
+  var grid = document.getElementById("grid"), out = document.getElementById("key");
+  var tiles = [];
+  for (var i = 0; i < COLS * ROWS; i++) {
+    var d = document.createElement("div");
+    d.className = "tile";
+    d.textContent = String(i + 1);
+    grid.appendChild(d);
+    tiles.push(d);
+  }
+  function draw() {
+    for (var i = 0; i < tiles.length; i++) {
+      tiles[i].className = tiles[i].className.replace(" focus", "") + (i === pos ? " focus" : "");
+    }
+  }
+  document.addEventListener("keydown", function (e) {
+    var k = e.keyCode, r = Math.floor(pos / COLS), c = pos % COLS;
+    out.textContent = "key: " + (e.key || "?") + "  keyCode: " + k + "  code: " + (e.code || "?");
+    if (k === 37 && c > 0) pos--;
+    else if (k === 39 && c < COLS - 1) pos++;
+    else if (k === 38 && r > 0) pos -= COLS;
+    else if (k === 40 && r < ROWS - 1) pos += COLS;
+    else if (k === 13) tiles[pos].className = tiles[pos].className.indexOf(" sel") < 0
+      ? tiles[pos].className + " sel" : tiles[pos].className.replace(" sel", "");
+    if (k >= 37 && k <= 40) e.preventDefault();   // stop page scroll
+    draw();
+  });
+  draw();
+})();
+</script>
+</body>
+</html>

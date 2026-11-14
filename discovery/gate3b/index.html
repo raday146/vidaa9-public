@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VIDAA gate 3b read-only</title>
+<style>
+  body { font: 20px/1.5 system-ui, sans-serif; margin: 4vh 6vw; background:#111; color:#eee; }
+  h1 { font-size: 1.2em; }
+  #verdict { font-size: 6em; font-weight: bold; margin: .2em 0; }
+  #verdict.yes { color:#4c4; } #verdict.no { color:#e55; } #verdict.unk { color:#999; }
+  pre { white-space: pre-wrap; word-break: break-all; color:#ccc; font-size:.8em; }
+</style>
+</head>
+<body>
+<h1>VIDAA gate 3b &mdash; is "vidaa-launcher-gate3" installed?</h1>
+<div id="verdict" class="unk">...</div>
+<pre id="log"></pre>
+
+<script>
+"use strict";
+// READ-ONLY. Calls ONLY:
+//   a) Hisense_getInstalledApps(callback)
+//   b) HiUtils_createRequest('fileRead', {path, mode}) -- the vidaa-edge read
+//      (tools/vidaa-edge/src/app/services/app-management.service.ts:138-141).
+// No buttons, no writes, no install/uninstall, no Hisense_FileWrite.
+
+var TEST_APP_ID = "vidaa-launcher-gate3";
+var APPINFO_PATH = "websdk/Appinfo.json";   // vidaa-edge constant, service.ts:27
+var APPINFO_MODE = 6;                       // vidaa-edge constant, service.ts:28
+var CB_WAIT_MS = 4000;
+
+var logEl = document.getElementById("log"), verdictEl = document.getElementById("verdict");
+function log(s) { logEl.textContent += new Date().toISOString().slice(11, 19) + "  " + s + "\n"; }
+function show(v) { try { return JSON.stringify(v); } catch (e) { return String(v); } }
+function post(body) {
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", "/result", true);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.onreadystatechange = function () { if (xhr.readyState === 4) log("POST /result -> " + xhr.status); };
+    xhr.send(JSON.stringify(body));
+  } catch (e) { log("POST failed: " + e); }
+}
+function setVerdict(text, cls) { verdictEl.textContent = text; verdictEl.className = cls; }
+
+// Entries seen so far have {AppName, appId, URL, from, ...}; vidaa-edge writes {Id, AppName, ...}. Match either.
+function hasTestApp(list) {
+  return list.some(function (a) { return a && (a.appId === TEST_APP_ID || a.Id === TEST_APP_ID); });
+}
+
+// a) Hisense_getInstalledApps. Earlier run: callback args were [null, "<JSON string>"].
+function readInstalled() {
+  var f = window.Hisense_getInstalledApps, done = false;
+  if (typeof f !== "function") { log("Hisense_getInstalledApps: not a function"); setVerdict("n/a", "unk"); return; }
+  function finish(sync, cbArgs) {
+    if (done) return; done = true;
+    var raw = (cbArgs || []).filter(function (x) { return typeof x === "string"; })[0];
+    if (raw === undefined && typeof sync === "string") raw = sync;
+    var list = null, err = null;
+    try { list = JSON.parse(raw).AppInfo; } catch (e) { err = String(e); }
+    if (!Array.isArray(list)) {
+      log("getInstalledApps: could not parse list: " + err);
+      setVerdict("?", "unk");
+    } else {
+      var found = hasTestApp(list);
+      var nonPreset = list.filter(function (a) { return a && a.from !== "preset"; }).map(function (a) { return a.appId || a.Id; });
+      setVerdict(found ? "YES" : "NO", found ? "yes" : "no");
+      log("getInstalledApps: " + list.length + " apps, found=" + found + ", non-preset ids=" + show(nonPreset));
+    }
+    post({ kind: "installed-apps", collectedAt: new Date().toISOString(), syncReturn: sync === undefined ? null : sync, callbackArgs: cbArgs, parseError: err });
+    readAppinfoEdge();
+  }
+  var sync;
+  try { sync = f.call(window, function () { finish(sync, Array.prototype.slice.call(arguments)); }); }
+  catch (e) { log("getInstalledApps threw: " + e); finish(null, null); return; }
+  setTimeout(function () { if (!done) log("getInstalledApps: no callback after " + CB_WAIT_MS + " ms"); finish(sync, null); }, CB_WAIT_MS);
+}
+
+// b) vidaa-edge read: HiUtils_createRequest('fileRead', {path, mode}) -> {ret, msg}. Read only.
+function readAppinfoEdge() {
+  var f = window.HiUtils_createRequest, out;
+  if (typeof f !== "function") { out = { error: "HiUtils_createRequest not a function" }; }
+  else {
+    try {
+      var r = f("fileRead", { path: APPINFO_PATH, mode: APPINFO_MODE });
+      var msg = r && r.msg, valid = false;
+      try { JSON.parse(msg); valid = true; } catch (e) {}
+      out = { ret: r && r.ret, msgType: typeof msg, msgLength: msg == null ? null : String(msg).length, valid: valid, raw: r };
+    } catch (e) { out = { error: String(e && e.message || e) }; }
+  }
+  log("HiUtils fileRead " + APPINFO_PATH + ": " + show(out).slice(0, 600));
+  post({ kind: "appinfo-vidaa-edge-read", collectedAt: new Date().toISOString(), result: out });
+}
+
+readInstalled();
+</script>
+</body>
+</html>

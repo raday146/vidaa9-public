@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VIDAA gate 3 install</title>
+<style>
+  body { font: 20px/1.5 system-ui, sans-serif; margin: 4vh 6vw; background:#111; color:#eee; }
+  h1 { font-size: 1.4em; }
+  button { font: inherit; padding: .5em 1em; margin: 0 1em 1em 0; }
+  pre { white-space: pre-wrap; word-break: break-all; color:#ccc; font-size:.8em; }
+</style>
+</head>
+<body>
+<h1>VIDAA gate 3 &mdash; test tile</h1>
+<p>On load: <code>Hisense_getInstalledApps</code> only. Nothing else runs until a button is pressed.</p>
+<button id="install">Install test tile</button>
+<button id="remove">Remove test tile</button>
+<pre id="log"></pre>
+
+<script>
+"use strict";
+// Calls ONLY: Hisense_getInstalledApps (on load), Hisense_installApp (button),
+// Hisense_uninstallApp (button), and Hisense_FileRead (read-only, once, after a
+// successful install). No eval, no code fetched from the network.
+// Argument order copied from tools/vidaa-edge (see docs/05-gate3-runbook.md).
+
+var TEST_URL = "https://vidaa-dpad-test.raday146.workers.dev/";   // Cloudflare deploy of launcher/gate3-test (keep trailing /)
+var TEST_ICON_URL = TEST_URL + "icon.png";                   // icon.png is deployed next to the tile
+var TEST_APP_ID = "vidaa-launcher-gate3";
+var TEST_NAME = "D-pad Test";
+var STORE_TYPE = "store";                                    // value used by the reference installer
+var APPINFO_PATH = "websdk/Appinfo.json";                    // read-only, same file as the discovery page
+var CB_WAIT_MS = 4000;                                       // callback may never fire; report after this
+
+var logEl = document.getElementById("log");
+function log(s) { logEl.textContent += new Date().toISOString().slice(11, 19) + "  " + s + "\n"; }
+function show(v) {
+  try { return typeof v === "string" ? JSON.stringify(v) : (JSON.stringify(v) + " (" + typeof v + ")"); }
+  catch (e) { return String(v); }
+}
+
+// Calls window[name](...args, callback). Logs the sync return and every callback arg.
+// done(syncReturn, callbackArgs) runs on first callback, or after CB_WAIT_MS if none came.
+function invoke(name, args, done) {
+  var f = window[name];
+  if (typeof f !== "function") { log(name + ": not a function"); return; }
+  var finished = false, sync;
+  function finish(cbArgs) {
+    if (finished) return;
+    finished = true;
+    if (done) done(sync, cbArgs);
+  }
+  var cb = function () {
+    var a = Array.prototype.slice.call(arguments);
+    log(name + " callback: " + show(a));
+    finish(a);
+  };
+  log(name + "(" + show(args) + ", <callback>) ...");
+  try { sync = f.apply(window, args.concat([cb])); }
+  catch (e) { log(name + " threw: " + String(e && e.message || e)); finish(null); return; }
+  log(name + " returned: " + show(sync));
+  setTimeout(function () {
+    if (!finished) log(name + ": no callback after " + CB_WAIT_MS + " ms");
+    finish(null);
+  }, CB_WAIT_MS);
+}
+
+// Read-only chunked Hisense_FileRead(path, offset), same logic as discovery/page/index.html.
+// ponytail: offset = chars returned; byte-aware only if a multibyte Appinfo breaks the JSON check.
+function readAppinfo() {
+  if (typeof window.Hisense_FileRead !== "function") return { error: "Hisense_FileRead not a function" };
+  var parts = [], offset = 0, firstLen = 0;
+  for (var i = 0; i < 200; i++) {
+    var chunk;
+    try { chunk = window.Hisense_FileRead(APPINFO_PATH, offset); }
+    catch (e) { return { error: String(e && e.message || e), partial: parts.join("") }; }
+    if (chunk == null || chunk === "" || chunk === "null" || chunk === "undefined") break;
+    chunk = String(chunk);
+    parts.push(chunk);
+    if (i === 0) firstLen = chunk.length;
+    offset += chunk.length;
+    if (offset > 5 * 1024 * 1024) return { error: "exceeded size cap", partial: parts.join("") };
+    if (chunk.length < firstLen) break;
+  }
+  var content = parts.join(""), valid = false;
+  try { JSON.parse(content); valid = true; } catch (e) {}
+  return { content: content, length: content.length, valid: valid };
+}
+
+function post(body) {
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", "/result", true);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.onreadystatechange = function () { if (xhr.readyState === 4) log("POST /result -> " + xhr.status); };
+    xhr.send(JSON.stringify(body));
+  } catch (e) { log("POST failed: " + e); }
+}
+
+document.getElementById("install").onclick = function () {
+  if (TEST_URL.indexOf("REPLACE-ME") !== -1) { log("TEST_URL is still the placeholder: not calling install"); return; }
+  this.disabled = true;   // one press per page load
+  invoke("Hisense_installApp",
+    [TEST_APP_ID, TEST_NAME, TEST_ICON_URL, TEST_ICON_URL, TEST_ICON_URL, TEST_URL, STORE_TYPE],
+    function (sync, cbArgs) {
+      post({ kind: "install-result", collectedAt: new Date().toISOString(), syncReturn: sync === undefined ? null : sync, callbackArgs: cbArgs });
+      if (cbArgs && cbArgs[0] === 0) {          // reference: res === 0 means success
+        var a = readAppinfo();
+        log("Appinfo.json after install: " + (a.error ? "error: " + a.error : a.length + " chars, valid JSON: " + a.valid));
+        post({ kind: "appinfo-after-install", collectedAt: new Date().toISOString(), appinfo: a });
+      } else {
+        log("install not reported successful (callback 0): Appinfo.json not read");
+      }
+    });
+};
+
+document.getElementById("remove").onclick = function () {
+  invoke("Hisense_uninstallApp", [TEST_APP_ID]);
+};
+
+// "before" backup: read-only call, result also saved on the Mac.
+invoke("Hisense_getInstalledApps", [], function (sync, cbArgs) {
+  post({ kind: "before", collectedAt: new Date().toISOString(), syncReturn: sync === undefined ? null : sync, callbackArgs: cbArgs });
+});
+</script>
+</body>
+</html>
